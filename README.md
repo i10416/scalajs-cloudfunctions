@@ -122,13 +122,13 @@ gcloud iam service-accounts add-iam-policy-binding "${TF_SERVICE_AGENT}" \
 
 #### Github Actions
 
-| name                        | example value                                                                              | description                |
-| --------------------------- | ------------------------------------------------------------------------------------------ | -------------------------- |
-| TF_CLI_VERSION              | 1.1.19                                                                                     | terraform version          |
-| TF_GCP_SERVICE_ACCOUNT      | terraform@project.iam.gserviceaccount.com                                                  | terraform service account  |
-| GCP_PROJECT_ID              |                                                                                            | gcp project id             |
-| GCP_REGION                  | asia-northeast1                                                                            | gcp region                 |
-| GCP_FUNCTION_NAME           | main                                                                                       | cloud function entrypoint  |
-| GCP_FUNCTION_BUCKET         | main-bucket                                                                                | cloud function bucket name |
-| GCP_WORKLOAD_ID_PROVIDER_ID | projects/project_number/locations/global/workloadIdentityPolls/pool_id/providers/oidc-name |                            |
+| name                        | example value                                                                                 | description                |
+| --------------------------- | --------------------------------------------------------------------------------------------- | -------------------------- |
+| TF_CLI_VERSION              | 1.1.19                                                                                        | terraform version          |
+| TF_GCP_SERVICE_ACCOUNT      | terraform@project.iam.gserviceaccount.com                                                     | terraform service account  |
+| GCP_PROJECT_ID              |                                                                                               | gcp project id             |
+| GCP_REGION                  | asia-northeast1                                                                               | gcp region                 |
+| GCP_FUNCTION_NAME           | main                                                                                          | cloud function entrypoint  |
+| GCP_FUNCTION_BUCKET         | main-bucket                                                                                   | cloud function bucket name |
+| GCP_WORKLOAD_ID_PROVIDER_ID | projects/project_number/locations/global/workloadIdentityPolls/$POOL_NAME/providers/oidc-name |                            |
 
