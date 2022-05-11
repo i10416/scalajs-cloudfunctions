@@ -32,6 +32,18 @@ function.tf
 }
 ```
 
+variables.tfvars.example
+
+```
+project_id      = "$GCPProjectID"
+function_name   = "$functionName"
+function_bucket = "$functionBucket"
+region          = "$GCPRegion"
+dist_dir        = "$localDistDir"
+
+```
+
+
 ## prerequisites
 - node
 - sbt
