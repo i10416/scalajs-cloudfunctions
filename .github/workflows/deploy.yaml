@@ -1,0 +1,158 @@
+name: CI/CD -- App
+
+env:
+  FULLOPT_FILE: /tmp/index.js
+
+on:
+  push:
+    branches: [main,master]
+    paths:
+      - 'app/**'
+      - 'terraform/**'
+      - '.github/workflows/deploy.yaml'
+  pull_request:
+    branches: [main,master]
+    paths:
+    paths:
+      - 'app/**'
+      - 'terraform/**'
+      - '.github/workflows/deploy.yaml'
+  workflow_dispatch:
+    inputs:
+      cmd:
+        type: choice
+        required: true
+        description: terraform command to run
+        options:
+          - plan
+          - apply
+          - destroy
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: build js src
+        run: sbt fullOptJS
+        working-directory: app
+        env:
+          FULLOPT_FILE: ${{ env.FULLOPT_FILE }}
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: function_src
+          path: ${{ env.FULLOPT_FILE }}
+  ci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+      # required to post issue comment
+      issues: 'write'
+      pull-requests: 'write'
+    needs: build
+    steps:
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ secrets.TF_CLI_VERSION }}
+      # note: You must run the actions/checkout@v3 step before this action.(from doc https://github.com/google-github-actions/auth)
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Authenticate to Google Cloud
+        id: 'google-cloud-auth'
+        uses: 'google-github-actions/auth@v0'
+        with:
+          create_credentials_file: true
+          workload_identity_provider: "${{ secrets.GCP_WORKLOAD_ID_PROVIDER_ID }}"
+          service_account: "${{ secrets.TF_GCP_SERVICE_ACCOUNT }}"
+      - name: Google Cloud login
+        run: gcloud auth login --brief --cred-file="${{ steps.google-cloud-auth.outputs.credentials_file_path }}"
+            
+      
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        working-directory: terraform
+      
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check
+        working-directory: terraform
+      
+      - name: Download Artifact
+        uses: actions/download-artifact@v3
+        id: download_dist_src
+        with:
+          name: function_src
+          path: dist
+      - name: Terraform Plan
+        id: plan
+        if: github.event_name == 'pull_request' || github.event.inputs.cmd == 'plan'
+        run: terraform plan -no-color -input=false
+        working-directory: terraform
+        continue-on-error: true
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_function_name: ${{ secrets.GCP_FUNCTION_NAME }} 
+          TF_VAR_function_bucket: ${{ secrets.GCP_FUNCTION_BUCKET }} 
+          TF_VAR_dist_dir: ${{ steps.download_dist_src.outputs.download-path }}
+          TF_VAR_region: ${{ secrets.GCP_REGION }} 
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+        working-directory: terraform
+      - name: Update Pull Request
+        uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`\n
+            ${process.env.PLAN}
+            \`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+      
+      
+      - name: Terraform Apply
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/head/master') && github.event_name == 'push' || github.event.inputs.cmd == 'apply'
+        run: terraform apply -auto-approve -input=false
+        working-directory: terraform/archive_channel_event_handler
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_function_name: ${{ secrets.GCP_FUNCTION_NAME }} 
+          TF_VAR_function_bucket: ${{ secrets.GCP_FUNCTION_BUCKET }} 
+          TF_VAR_dist_dir: ${{ steps.download_dist_src.outputs.download-path }}
+          TF_VAR_region: ${{ secrets.GCP_REGION }} 
+      
+      - name: Terraform Destroy
+        if: github.event.inputs.cmd == 'destroy'
+        run: terraform destroy -auto-approve -input=false
+        working-directory: terraform/archive_channel_event_handler
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_function_name: ${{ secrets.GCP_FUNCTION_NAME }} 
+          TF_VAR_function_bucket: ${{ secrets.GCP_FUNCTION_BUCKET }} 
+          TF_VAR_dist_dir: ${{ steps.download_dist_src.outputs.download-path }}
+          TF_VAR_region: ${{ secrets.GCP_REGION }} 
+
