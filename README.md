@@ -9,6 +9,8 @@ If you prefer giter8, run `g8 i10416/scalajs-cloudfunctions.g8`.
 
 Replace `$***`s with your own setting.
 
+For example, there are some `$***`s in source files.
+
 Main.scala
 
 ```scala
